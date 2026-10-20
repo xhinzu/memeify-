@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Memify — Online Meme Studio & Image Editor</title>
+  <meta name="description" content="Create meme-style headers, captions, stickers, draw, blur, and glitch filters on any image directly in your browser with Memify.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bricolage+Grotesque:wght@400;500;600;700&display=swap">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f3f1ec;
+      --panel: #ffffff;
+      --ink: #1a1b1f;
+      --mute: #6b6d75;
+      --line: #d9d6cd;
+      --acc: #1a1b1f;
+      --onacc: #ffd23f;
+      --stage: #e4e1d9;
+      --accent-glow: rgba(255, 210, 63, 0.4);
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #15161a;
+        --panel: #202228;
+        --ink: #ecebe6;
+        --mute: #9a9ca5;
+        --line: #34363e;
+        --acc: #ffd23f;
+        --onacc: #15161a;
+        --stage: #0f1013;
+        --accent-glow: rgba(255, 210, 63, 0.2);
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #15161a;
+      --panel: #202228;
+      --ink: #ecebe6;
+      --mute: #9a9ca5;
+      --line: #34363e;
+      --acc: #ffd23f;
+      --onacc: #15161a;
+      --stage: #0f1013;
+      --accent-glow: rgba(255, 210, 63, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px "Bricolage Grotesque", system-ui, -apple-system, sans-serif;
+      user-select: none;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    aside {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .brand h1 {
+      font: 400 32px Anton, Impact, sans-serif;
+      margin: 0;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, var(--ink) 0%, var(--mute) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand .tagline {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: var(--acc);
+      color: var(--onacc);
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--panel);
+      transition: border-color 0.15s ease;
+    }
+
+    details[open] {
+      border-color: var(--line);
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+      outline: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    summary::after {
+      content: "▾";
+      font-size: 12px;
+      transition: transform 0.15s ease;
+      color: var(--mute);
+    }
+
+    details:not([open]) summary::after {
+      transform: rotate(-90deg);
+    }
+
+    details > * {
+      margin-top: 8px;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: var(--mute);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    textarea, select, input[type=text] {
+      font: inherit;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus, select:focus, input[type=text]:focus {
+      border-color: var(--ink);
+    }
+
+    textarea {
+      min-height: 48px;
+      resize: vertical;
+      line-height: 1.35;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--acc);
+      cursor: pointer;
+    }
+
+    input[type=color] {
+      width: 100%;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--bg);
+      padding: 2px;
+      cursor: pointer;
+    }
+
+    .row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .row > * {
+      flex: 1;
+    }
+
+    button {
+      font: inherit;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s, transform 0.05s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--ink);
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    button[aria-pressed=true], .pri {
+      background: var(--acc);
+      color: var(--onacc);
+      border-color: var(--acc);
+      font-weight: 700;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--acc);
+      outline-offset: 2px;
+    }
+
+    main {
+      background: var(--stage);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: relative;
+    }
+
+    .bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 10px 14px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+      z-index: 10;
+    }
+
+    .bar select {
+      width: auto;
+      min-width: 65px;
+      font-size: 15px;
+    }
+
+    .sp {
+      flex: 1;
+    }
+
+    .stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+      display: none;
+      touch-action: none;
+      border-radius: 2px;
+    }
+
+    .drop {
+      width: min(480px, 100%);
+      border: 2px dashed var(--mute);
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--mute);
+      cursor: pointer;
+      background: var(--panel);
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .drop:hover {
+      border-color: var(--ink);
+    }
+
+    .drop b {
+      display: block;
+      color: var(--ink);
+      font: 400 26px Anton, Impact, sans-serif;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .drop span {
+      display: block;
+      font-size: 13px;
+      margin-top: 4px;
+      opacity: 0.85;
+    }
+
+    .note {
+      font-size: 12px;
+      color: var(--mute);
+      min-height: 16px;
+      padding: 4px 2px;
+      border-top: 1px dashed var(--line);
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      main {
+        order: -1;
+        height: 70vh;
+      }
+      aside {
+        border-right: 0;
+        border-top: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand">
+        <h1>MEMIFY</h1>
+        <span class="tagline">Studio</span>
+      </div>
+
+      <details open>
+        <summary>Header &amp; Caption</summary>
+        <label>
+          Header (above image)
+          <textarea id="top" placeholder="Enter top text...">ok and?</textarea>
+        </label>
+        <label>
+          Caption (below image)
+          <textarea id="bot" placeholder="Enter bottom caption..."></textarea>
+        </label>
+        <label>
+          Font
+          <select id="font">
+            <option value="Anton, Impact, sans-serif|400">Meme (Anton)</option>
+            <option value="Arial, Helvetica, sans-serif|400">Clean (Arial)</option>
+            <option value="Arial, Helvetica, sans-serif|700">Clean bold</option>
+            <option value="Georgia, serif|700">Serif</option>
+            <option value="'Courier New', monospace|700">Mono</option>
+          </select>
+        </label>
+        <label>
+          Size
+          <input type="range" id="size" min="3" max="16" step=".25" value="9">
+        </label>
+        <label>
+          Padding
+          <input type="range" id="pad" min="1" max="12" step=".25" value="3">
+        </label>
+        <div class="row">
+          <label>Text<input type="color" id="color" value="#000000"></label>
+          <label>Bar<input type="color" id="bg" value="#ffffff"></label>
+        </div>
+        <div class="row" id="align">
+          <button type="button" data-v="left" aria-pressed="false">Left</button>
+          <button type="button" data-v="center" aria-pressed="true">Center</button>
+          <button type="button" data-v="right" aria-pressed="false">Right</button>
+        </div>
+        <div class="row" id="upper">
+          <button type="button" data-v="0" aria-pressed="true">As typed</button>
+          <button type="button" data-v="1" aria-pressed="false">UPPERCASE</button>
+        </div>
+      </details>
+
+      <details>
+        <summary>Presets</summary>
+        <select id="preset"></select>
+        <div class="row">
+          <input type="text" id="pname" placeholder="Preset name">
+          <button type="button" id="psave">Save current</button>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Selected Item</summary>
+        <label>Text / Emoji<input type="text" id="itxt" disabled></label>
+        <label>Size<input type="range" id="isize" min="2" max="40" step=".5" value="9" disabled></label>
+        <div class="row">
+          <label>Color<input type="color" id="icolor" value="#ffffff"></label>
+          <label style="justify-content: flex-end; cursor: pointer;">
+            <span><input type="checkbox" id="iout" checked> Black outline</span>
+          </label>
+        </div>
+        <button type="button" id="idel" disabled>Delete item</button>
+      </details>
+
+      <details>
+        <summary>Image: Crop, Rotate, Resize</summary>
+        <div class="row">
+          <button type="button" id="rl">Rotate left</button>
+          <button type="button" id="rr">Rotate right</button>
+          <button type="button" id="fl">Flip</button>
+        </div>
+        <div class="row">
+          <select id="crop">
+            <option value="1">Crop 1:1 (Square)</option>
+            <option value="0.8">Crop 4:5 (Portrait)</option>
+            <option value="1.7778">Crop 16:9 (Landscape)</option>
+            <option value="0.5625">Crop 9:16 (Story)</option>
+          </select>
+          <button type="button" id="capply">Crop</button>
+        </div>
+        <div class="row">
+          <select id="scale">
+            <option value="0.75">75%</option>
+            <option value="0.5">50%</option>
+            <option value="0.25">25%</option>
+            <option value="2">200%</option>
+          </select>
+          <button type="button" id="sapply">Resize</button>
+        </div>
+      </details>
+
+      <details>
+        <summary>Filters</summary>
+        <div class="row" id="filters">
+          <button type="button" data-f="gray">Gray</button>
+          <button type="button" data-f="sepia">Sepia</button>
+          <button type="button" data-f="invert">Invert</button>
+          <button type="button" data-f="pix">Pixelate</button>
+          <button type="button" data-f="glitch">Glitch</button>
+          <button type="button" data-f="fry">Deep fry</button>
+        </div>
+      </details>
+
+      <details>
+        <summary>Project &amp; Batch</summary>
+        <div class="row">
+          <button type="button" id="psaveproj">Save project</button>
+          <button type="button" id="popen">Open project</button>
+        </div>
+        <button type="button" id="batch">Batch: apply header to many images (ZIP)</button>
+        <input type="file" id="pfile" accept=".json" hidden>
+        <input type="file" id="bfile" accept="image/*" multiple hidden>
+      </details>
+
+      <div class="note" id="note">Drop, paste or choose an image to start.</div>
+    </aside>
+
+    <main>
+      <div class="bar">
+        <span class="row" id="tools" style="flex:none">
+          <button type="button" data-t="move" aria-pressed="true">Move</button>
+          <button type="button" data-t="text" aria-pressed="false">Text</button>
+          <button type="button" data-t="emoji" aria-pressed="false">Sticker</button>
+          <button type="button" data-t="draw" aria-pressed="false">Draw</button>
+          <button type="button" data-t="blur" aria-pressed="false">Blur</button>
+          <button type="button" data-t="pix" aria-pressed="false">Censor</button>
+        </span>
+        <select id="emoji" title="Select sticker emoji">
+          <option>😂</option>
+          <option>💀</option>
+          <option>🔥</option>
+          <option>👀</option>
+          <option>😭</option>
+          <option>🗿</option>
+          <option>👍</option>
+          <option>❤️</option>
+          <option>🤡</option>
+          <option>⭐</option>
+        </select>
+        <span class="sp"></span>
+        <button type="button" id="undo" title="Undo (Ctrl+Z)">Undo</button>
+        <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+        <button type="button" id="open">Open image</button>
+        <button type="button" id="copy">Copy</button>
+        <button type="button" id="save" class="pri" disabled>Save PNG</button>
+        <input type="file" id="file" accept="image/*" hidden>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="drop" id="drop">
+          <b>Drop an image here</b>
+          <span>or click to choose a file. You can also paste with Ctrl+V.</span>
+        </div>
+        <canvas id="cv"></canvas>
+      </div>
+    </main>
+  </div>
+
+  <script>
+  (function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var cv = $('cv');
+    var src = null;
+    var items = [];
+    var sel = null;
+    var tool = 'move';
+    var hist = [];
+    var hi = -1;
+    var top = 0;
+    var OFF = 0;
+    var name = 'memify';
+    var A = 'center';
+    var U = false;
+    var down = false;
+    var cur = null;
+    var last = null;
+    var dl = null;
+
+    function mk(w, h) {
+      var c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      return c;
+    }
+
+    function note(text) {
+      $('note').textContent = text;
+    }
+
+    function opts() {
+      var p = $('font').value.split('|');
+      return {
+        fam: p[0],
+        wt: p[1],
+        upper: U,
+        align: A,
+        size: +$('size').value,
+        pad: +$('pad').value,
+        color: $('color').value,
+        bg: $('bg').value,
+        top: $('top').value,
+        bot: $('bot').value
+      };
+    }
+
+    function wrapT(ctx, text, maxWidth) {
+      var lines = [];
+      text.split('\n').forEach(function (paragraph) {
+        if (!paragraph.trim()) return;
+        var current = '';
+        paragraph.split(/\s+/).forEach(function (word) {
+          var testLine = current ? current + ' ' + word : word;
+          if (ctx.measureText(testLine).width > maxWidth && current) {
+            lines.push(current);
+            current = word;
+          } else {
+            current = testLine;
+          }
+        });
+        lines.push(current);
+      });
+      return lines;
+    }
+
+    function drawItem(ctx, item, W, showUi) {
+      if (item.t === 'draw') {
+        ctx.strokeStyle = item.c;
+        ctx.lineWidth = item.w;
+        ctx.lineCap = ctx.lineJoin = 'round';
+        ctx.beginPath();
+        item.p.forEach(function (point, idx) {
+          if (idx) ctx.lineTo(point[0], point[1]);
+          else ctx.moveTo(point[0], point[1]);
+        });
+        if (item.p.length === 1) {
+          ctx.lineTo(item.p[0][0] + 0.1, item.p[0][1]);
+        }
+        ctx.stroke();
+        return;
+      }
+
+      if (item.t === 'blur' || item.t === 'pix') {
+        var X = Math.round(item.x);
+        var Y = Math.round(item.y);
+        var w = Math.round(item.w);
+        var h = Math.round(item.h);
+        if (w > 1 && h > 1) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(X, Y, w, h);
+          ctx.clip();
+          if (item.t === 'blur') {
+            ctx.filter = 'blur(' + Math.max(4, W / 80) + 'px)';
+            ctx.drawImage(ctx.canvas, X, Y + OFF, w, h, X, Y, w, h);
+          } else {
+            var k = Math.max(6, W / 60);
+            var s = mk(Math.max(1, w / k), Math.max(1, h / k));
+            s.getContext('2d').drawImage(ctx.canvas, X, Y + OFF, w, h, 0, 0, s.width, s.height);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(s, 0, 0, s.width, s.height, X, Y, w, h);
+          }
+          ctx.restore();
+        }
+      } else {
+        var fs = W * item.s / 100;
+        ctx.font = item.t === 'emoji' ? fs + 'px serif' : fs + 'px Anton, Impact, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        var w2 = ctx.measureText(item.txt).width;
+        item.b = [item.x - w2 / 2, item.y - fs / 2, w2, fs];
+
+        if (item.t === 'text') {
+          if (item.o) {
+            ctx.strokeStyle = '#000000';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = fs / 6;
+            ctx.strokeText(item.txt, item.x, item.y);
+          }
+          ctx.fillStyle = item.c;
+          ctx.fillText(item.txt, item.x, item.y);
+        } else {
+          ctx.fillText(item.txt, item.x, item.y);
+        }
+      }
+
+      if (showUi && item === sel) {
+        var b = item.b || [item.x, item.y, item.w, item.h];
+        ctx.save();
+        ctx.setLineDash([8, 6]);
+        ctx.lineWidth = Math.max(2, W / 300);
+        ctx.strokeStyle = '#ffd23f';
+        if (item.p) {
+          b = [
+            Math.min.apply(0, item.p.map(function (q) { return q[0]; })),
+            Math.min.apply(0, item.p.map(function (q) { return q[1]; })),
+            30,
+            30
+          ];
+        }
+        ctx.strokeRect(b[0], b[1], b[2], b[3]);
+        ctx.restore();
+      }
+    }
+
+    function render(c, s, its, o, showUi) {
+      var x = c.getContext('2d');
+      var W = s.width;
+      var H = s.height;
+      var fs = W * o.size / 100;
+      var pad = W * o.pad / 100;
+      var lh = fs * 1.18;
+
+      c.width = W;
+      c.height = H;
+      x.font = o.wt + ' ' + fs + 'px ' + o.fam;
+
+      var formatText = function (t) { return o.upper ? t.toUpperCase() : t; };
+      var tl = wrapT(x, formatText(o.top), W - 2 * pad);
+      var bl = wrapT(x, formatText(o.bot), W - 2 * pad);
+
+      var hT = tl.length ? Math.round(tl.length * lh + 2 * pad) : 0;
+      var hB = bl.length ? Math.round(bl.length * lh + 2 * pad) : 0;
+
+      c.width = W;
+      c.height = hT + H + hB;
+
+      x.fillStyle = o.bg;
+      x.fillRect(0, 0, W, c.height);
+      x.drawImage(s, 0, hT);
+
+      x.font = o.wt + ' ' + fs + 'px ' + o.fam;
+      x.fillStyle = o.color;
+      x.textBaseline = 'middle';
+      x.textAlign = o.align;
+
+      var px = o.align === 'left' ? pad : o.align === 'right' ? W - pad : W / 2;
+      tl.forEach(function (line, i) {
+        x.fillText(line, px, pad + lh * (i + 0.5));
+      });
+      bl.forEach(function (line, i) {
+        x.fillText(line, px, hT + H + pad + lh * (i + 0.5));
+      });
+
+      OFF = hT;
+      x.save();
+      x.translate(0, hT);
+      its.forEach(function (t) {
+        x.save();
+        drawItem(x, t, W, showUi);
+        x.restore();
+      });
+      x.restore();
+
+      return hT;
+    }
+
+    function R() {
+      if (src) {
+        top = render(cv, src, items, opts(), true);
+      }
+    }
+
+    function out() {
+      var c = mk(1, 1);
+      render(c, src, items, opts(), false);
+      return c;
+    }
+
+    function commit() {
+      hist = hist.slice(0, hi + 1);
+      hist.push({ s: src, i: JSON.stringify(items) });
+      hi++;
+      if (hist.length > 50) {
+        hist.shift();
+        hi--;
+      }
+    }
+
+    function go(n) {
+      if (n < 0 || n >= hist.length) return;
+      hi = n;
+      src = hist[n].s;
+      items = JSON.parse(hist[n].i);
+      sel = null;
+      sync();
+    }
+
+    function sync() {
+      var t = sel;
+      var on = t && (t.t === 'text' || t.t === 'emoji');
+      $('itxt').disabled = $('isize').disabled = !on;
+      $('idel').disabled = !t;
+      if (on) {
+        $('itxt').value = t.txt;
+        $('isize').value = t.s;
+        $('icolor').value = t.c;
+        $('iout').checked = !!t.o;
+      }
+      R();
+    }
+
+    function setNew(canvasImage, newName, newItems) {
+      src = canvasImage;
+      items = newItems || [];
+      sel = null;
+      name = newName || 'memify';
+      hist = [];
+      hi = -1;
+      commit();
+      $('drop').style.display = 'none';
+      cv.style.display = 'block';
+      $('save').disabled = false;
+      sync();
+    }
+
+    function loadImg(url) {
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.onload = function () {
+          var c = mk(img.naturalWidth, img.naturalHeight);
+          c.getContext('2d').drawImage(img, 0, 0);
+          resolve(c);
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    function loadFile(file) {
+      if (!file || file.type.indexOf('image/') !== 0) {
+        note('Please choose an image file.');
+        return;
+      }
+      var url = URL.createObjectURL(file);
+      loadImg(url).then(function (c) {
+        setNew(c, file.name.replace(/\.[^.]+$/, ''));
+        note('Image loaded.');
+      }).catch(function () {
+        note('Could not read that image.');
+      });
+    }
+
+    ['top', 'bot', 'font', 'size', 'pad', 'color', 'bg'].forEach(function (id) {
+      $(id).addEventListener('input', R);
+    });
+
+    function seg(id, callback) {
+      $(id).addEventListener('click', function (e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        [].forEach.call($(id).children, function (child) {
+          child.setAttribute('aria-pressed', child === btn);
+        });
+        callback(btn.dataset.v);
+        R();
+      });
+    }
+
+    seg('align', function (v) { A = v; });
+    seg('upper', function (v) { U = (v === '1'); });
+
+    function setTool() {
+      [].forEach.call($('tools').children, function (btn) {
+        btn.setAttribute('aria-pressed', btn.dataset.t === tool);
+      });
+      cv.style.cursor = tool === 'move' ? 'default' : 'crosshair';
+    }
+
+    $('tools').onclick = function (e) {
+      var btn = e.target.closest('button');
+      if (btn) {
+        tool = btn.dataset.t;
+        setTool();
+      }
+    };
+
+    function toImg(e) {
+      var rect = cv.getBoundingClientRect();
+      var k = cv.width / rect.width;
+      return [(e.clientX - rect.left) * k, (e.clientY - rect.top) * k - top];
+    }
+
+    function hit(px, py) {
+      for (var i = items.length - 1; i >= 0; i--) {
+        var item = items[i];
+        if (item.t === 'draw') {
+          if (item.p.some(function (pt) { return Math.hypot(pt[0] - px, pt[1] - py) < item.w * 2; })) {
+            return item;
+          }
+        } else {
+          var b = (item.b && item.t !== 'blur' && item.t !== 'pix') ? item.b : [item.x, item.y, item.w, item.h];
+          if (px >= b[0] && px <= b[0] + b[2] && py >= b[1] && py <= b[1] + b[3]) {
+            return item;
+          }
+        }
+      }
+      return null;
+    }
+
+    cv.onpointerdown = function (e) {
+      if (!src) return;
+      cv.setPointerCapture(e.pointerId);
+      var p = toImg(e);
+      var W = src.width;
+
+      if (tool === 'move') {
+        cur = hit(p[0], p[1]);
+        sel = cur;
+        last = p;
+        sync();
+      } else if (tool === 'text' || tool === 'emoji') {
+        var item = {
+          t: tool,
+          x: p[0],
+          y: p[1],
+          s: tool === 'text' ? 9 : 14,
+          c: tool === 'text' ? '#ffffff' : '#000000',
+          o: true,
+          txt: tool === 'text' ? 'TEXT' : $('emoji').value
+        };
+        items.push(item);
+        sel = item;
+        tool = 'move';
+        setTool();
+        commit();
+        sync();
+        if (item.t === 'text') {
+          $('itxt').focus();
+          $('itxt').select();
+        }
+        return;
+      } else if (tool === 'draw') {
+        cur = { t: 'draw', p: [p], c: $('icolor').value, w: W / 120 };
+        items.push(cur);
+      } else {
+        cur = { t: tool, x: p[0], y: p[1], w: 0, h: 0, x0: p[0], y0: p[1] };
+        items.push(cur);
+      }
+      down = true;
+      R();
+    };
+
+    cv.onpointermove = function (e) {
+      if (!down || !cur) return;
+      var p = toImg(e);
+      if (tool === 'move') {
+        var dx = p[0] - last[0];
+        var dy = p[1] - last[1];
+        last = p;
+        if (cur.p) {
+          cur.p.forEach(function (q) { q[0] += dx; q[1] += dy; });
+        } else {
+          cur.x += dx;
+          cur.y += dy;
+        }
+      } else if (tool === 'draw') {
+        cur.p.push(p);
+      } else {
+        cur.x = Math.min(p[0], cur.x0);
+        cur.y = Math.min(p[1], cur.y0);
+        cur.w = Math.abs(p[0] - cur.x0);
+        cur.h = Math.abs(p[1] - cur.y0);
+      }
+      R();
+    };
+
+    cv.onpointerup = function () {
+      if (down && cur) commit();
+      down = false;
+      cur = null;
+    };
+
+    function sset(key, val) {
+      if (sel && (sel.t === 'text' || sel.t === 'emoji')) {
+        sel[key] = val;
+        R();
+      }
+    }
+
+    $('itxt').oninput = function () { sset('txt', this.value); };
+    $('isize').oninput = function () { sset('s', +this.value); };
+    $('icolor').oninput = function () { sset('c', this.value); };
+    $('iout').onchange = function () { sset('o', this.checked); commit(); };
+    ['itxt', 'isize', 'icolor'].forEach(function (id) {
+      $(id).onchange = commit;
+    });
+
+    $('idel').onclick = function () {
+      items = items.filter(function (t) { return t !== sel; });
+      sel = null;
+      commit();
+      sync();
+    };
+
+    $('undo').onclick = function () { go(hi - 1); };
+    $('redo').onclick = function () { go(hi + 1); };
+
+    document.addEventListener('keydown', function (e) {
+      var typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        go(e.shiftKey ? hi + 1 : hi - 1);
+      } else if (!typing && (e.key === 'Delete' || e.key === 'Backspace') && sel) {
+        $('idel').click();
+      }
+    });
+
+    function mapAll(transformFn) {
+      items.forEach(function (t) {
+        if (t.p) {
+          t.p = t.p.map(function (q) { return transformFn(q[0], q[1]); });
+        } else if (t.w !== undefined) {
+          var a = transformFn(t.x, t.y);
+          var b = transformFn(t.x + t.w, t.y + t.h);
+          t.x = Math.min(a[0], b[0]);
+          t.y = Math.min(a[1], b[1]);
+          t.w = Math.abs(a[0] - b[0]);
+          t.h = Math.abs(a[1] - b[1]);
+        } else {
+          var r = transformFn(t.x, t.y);
+          t.x = r[0];
+          t.y = r[1];
+        }
+      });
+    }
+
+    function apply(canvasImage, transformFn) {
+      if (!src) return;
+      src = canvasImage;
+      if (transformFn) mapAll(transformFn);
+      sel = null;
+      commit();
+      sync();
+    }
+
+    function rot(direction) {
+      var W = src.width;
+      var H = src.height;
+      var c = mk(H, W);
+      var x = c.getContext('2d');
+      if (direction > 0) {
+        x.translate(H, 0);
+        x.rotate(Math.PI / 2);
+      } else {
+        x.translate(0, W);
+        x.rotate(-Math.PI / 2);
+      }
+      x.drawImage(src, 0, 0);
+      apply(c, direction > 0 ? function (a, b) { return [H - b, a]; } : function (a, b) { return [b, W - a]; });
+    }
+
+    $('rl').onclick = function () { if (src) rot(-1); };
+    $('rr').onclick = function () { if (src) rot(1); };
+
+    $('fl').onclick = function () {
+      if (!src) return;
+      var W = src.width;
+      var c = mk(W, src.height);
+      var x = c.getContext('2d');
+      x.translate(W, 0);
+      x.scale(-1, 1);
+      x.drawImage(src, 0, 0);
+      apply(c, function (a, b) { return [W - a, b]; });
+    };
+
+    $('capply').onclick = function () {
+      if (!src) return;
+      var r = +$('crop').value;
+      var W = src.width;
+      var H = src.height;
+      var cw = W;
+      var ch = W / r;
+      if (ch > H) {
+        ch = H;
+        cw = H * r;
+      }
+      cw = Math.round(cw);
+      ch = Math.round(ch);
+      var ox = Math.round((W - cw) / 2);
+      var oy = Math.round((H - ch) / 2);
+      var c = mk(cw, ch);
+      c.getContext('2d').drawImage(src, -ox, -oy);
+      apply(c, function (a, b) { return [a - ox, b - oy]; });
+    };
+
+    $('sapply').onclick = function () {
+      if (!src) return;
+      var k = +$('scale').value;
+      var c = mk(Math.round(src.width * k), Math.round(src.height * k));
+      c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+      apply(c, function (a, b) { return [a * k, b * k]; });
+    };
+
+    function jpg(canvasElem, quality) {
+      return loadImg(canvasElem.toDataURL('image/jpeg', quality));
+    }
+
+    $('filters').onclick = async function (e) {
+      var btn = e.target.closest('button');
+      if (!btn || !src) return;
+      var k = btn.dataset.f;
+      var W = src.width;
+      var H = src.height;
+      var c = mk(W, H);
+      var x = c.getContext('2d');
+
+      if (k === 'gray' || k === 'sepia' || k === 'invert') {
+        x.filter = k === 'gray' ? 'grayscale(1)' : k === 'sepia' ? 'sepia(1)' : 'invert(1)';
+        x.drawImage(src, 0, 0);
+      } else if (k === 'pix') {
+        var s = Math.max(4, W / 80);
+        var t = mk(Math.ceil(W / s), Math.ceil(H / s));
+        t.getContext('2d').drawImage(src, 0, 0, t.width, t.height);
+        x.imageSmoothingEnabled = false;
+        x.drawImage(t, 0, 0, W, H);
+      } else if (k === 'glitch') {
+        x.drawImage(src, 0, 0);
+        var d = x.getImageData(0, 0, W, H).data;
+        var o = x.createImageData(W, H);
+        var sh = Math.round(W / 60);
+        var clamp = function (v) { return Math.min(W - 1, Math.max(0, v)); };
+        for (var y = 0; y < H; y++) {
+          var off = Math.random() < 0.08 ? Math.round((Math.random() - 0.5) * W / 5) : 0;
+          for (var i = 0; i < W; i++) {
+            var j = (y * W + i) * 4;
+            o.data[j] = d[(y * W + clamp(i + sh + off)) * 4];
+            o.data[j + 1] = d[(y * W + clamp(i + off)) * 4 + 1];
+            o.data[j + 2] = d[(y * W + clamp(i - sh + off)) * 4 + 2];
+            o.data[j + 3] = 255;
+          }
+        }
+        x.putImageData(o, 0, 0);
+      } else {
+        x.filter = 'contrast(2.2) saturate(3) brightness(1.1)';
+        x.drawImage(src, 0, 0);
+        x.filter = 'none';
+        for (var n = 0; n < 3; n++) {
+          var j2 = await jpg(c, 0.05);
+          x.drawImage(j2, 0, 0);
+        }
+      }
+      apply(c);
+      note('Filter applied: ' + btn.textContent);
+    };
+
+    function save(blob, filename) {
+      if (!dl) {
+        if (!(blob instanceof Blob)) {
+          blob = new Blob([blob], { type: 'application/json' });
+        }
+        var a = document.createElement('a');
+        var u = URL.createObjectURL(blob);
+        a.href = u;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(u); }, 2000);
+        note('Saved: ' + filename);
+        return;
+      }
+      dl.save({ filename: filename, data: blob }).then(function () {
+        note('Saved: ' + filename);
+      }).catch(function (e) {
+        note(e && e.code === 'declined' ? 'Save cancelled.' : 'Saving failed.');
+      });
+    }
+
+    $('save').onclick = function () {
+      if (src) {
+        out().toBlob(function (b) {
+          if (b) save(b, name + '-memify.png');
+        }, 'image/png');
+      }
+    };
+
+    $('copy').onclick = function () {
+      if (!src) return;
+      out().toBlob(function (b) {
+        try {
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).then(function () {
+            note('Copied image to clipboard.');
+          }).catch(function () {
+            note('Clipboard write blocked. Use Save PNG instead.');
+          });
+        } catch (e) {
+          note('Clipboard API not supported here. Use Save PNG.');
+        }
+      });
+    };
+
+    // Presets
+    var BUILT = {
+      'Classic meme': { font: 'Arial, Helvetica, sans-serif|400', size: 9, pad: 3, color: '#000000', bg: '#ffffff', align: 'center', upper: 0 },
+      'Bold shout': { font: 'Anton, Impact, sans-serif|400', size: 11, pad: 3, color: '#000000', bg: '#ffffff', align: 'center', upper: 1 },
+      'Dark mode': { font: 'Arial, Helvetica, sans-serif|700', size: 7, pad: 3, color: '#ffffff', bg: '#111111', align: 'left', upper: 0 }
+    };
+
+    function mine() {
+      try {
+        return JSON.parse(localStorage.getItem('memify_presets') || localStorage.getItem('hs_presets') || '{}');
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function fillPre() {
+      var all = Object.assign({}, BUILT, mine());
+      var s = $('preset');
+      s.innerHTML = '<option value="">Choose preset</option>';
+      Object.keys(all).forEach(function (k) {
+        var opt = document.createElement('option');
+        opt.textContent = k;
+        s.appendChild(opt);
+      });
+    }
+
+    function setStyle(p) {
+      $('font').value = p.font;
+      $('size').value = p.size;
+      $('pad').value = p.pad;
+      $('color').value = p.color;
+      $('bg').value = p.bg;
+      A = p.align;
+      U = !!+p.upper;
+      [].forEach.call($('align').children, function (c) {
+        c.setAttribute('aria-pressed', c.dataset.v === A);
+      });
+      [].forEach.call($('upper').children, function (c) {
+        c.setAttribute('aria-pressed', c.dataset.v === (U ? '1' : '0'));
+      });
+      R();
+    }
+
+    $('preset').onchange = function () {
+      var p = Object.assign({}, BUILT, mine())[this.value];
+      if (p) setStyle(p);
+    };
+
+    $('psave').onclick = function () {
+      var n = $('pname').value.trim();
+      if (!n) {
+        note('Type a preset name first.');
+        return;
+      }
+      var o = opts();
+      var m = mine();
+      m[n] = {
+        font: o.fam + '|' + o.wt,
+        size: o.size,
+        pad: o.pad,
+        color: o.color,
+        bg: o.bg,
+        align: A,
+        upper: U ? 1 : 0
+      };
+      try {
+        localStorage.setItem('memify_presets', JSON.stringify(m));
+        note('Preset "' + n + '" saved.');
+      } catch (e) {
+        note('Presets could not be saved to storage.');
+      }
+      fillPre();
+    };
+
+    // Project & batch
+    $('psaveproj').onclick = function () {
+      if (!src) return;
+      var o = opts();
+      save(JSON.stringify({
+        v: 1,
+        app: 'memify',
+        name: name,
+        img: src.toDataURL('image/png'),
+        items: items,
+        o: o,
+        A: A,
+        U: U
+      }), name + '-memify-project.json');
+    };
+
+    $('popen').onclick = function () { $('pfile').click(); };
+
+    $('pfile').onchange = function () {
+      var f = this.files[0];
+      this.value = '';
+      if (!f) return;
+      f.text().then(function (t) {
+        var j = JSON.parse(t);
+        return loadImg(j.img).then(function (c) {
+          $('top').value = j.o.top;
+          $('bot').value = j.o.bot;
+          setStyle({
+            font: j.o.fam + '|' + j.o.wt,
+            size: j.o.size,
+            pad: j.o.pad,
+            color: j.o.color,
+            bg: j.o.bg,
+            align: j.A,
+            upper: j.U ? 1 : 0
+          });
+          setNew(c, j.name, j.items);
+          note('Project "' + (j.name || 'memify') + '" loaded.');
+        });
+      }).catch(function () {
+        note("That isn't a valid Memify project file.");
+      });
+    };
+
+    $('batch').onclick = function () { $('bfile').click(); };
+
+    $('bfile').onchange = async function () {
+      var fs = [].slice.call(this.files);
+      this.value = '';
+      if (!fs.length) return;
+      if (!window.JSZip) {
+        note('ZIP library not loaded.');
+        return;
+      }
+      var z = new JSZip();
+      var o = opts();
+
+      for (var i = 0; i < fs.length; i++) {
+        note('Processing ' + (i + 1) + ' of ' + fs.length + '...');
+        try {
+          var c = await loadImg(URL.createObjectURL(fs[i]));
+          var t = mk(1, 1);
+          render(t, c, [], o, false);
+          var b = await new Promise(function (r) { t.toBlob(r, 'image/png'); });
+          z.file(fs[i].name.replace(/\.[^.]+$/, '') + '-memify.png', b);
+        } catch (e) {}
+      }
+      var blob = await z.generateAsync({ type: 'blob' });
+      save(blob, 'memify-batch.zip');
+    };
+
+    // User input / file loading
+    $('open').onclick = $('drop').onclick = function () { $('file').click(); };
+    $('file').onchange = function () {
+      loadFile(this.files[0]);
+      this.value = '';
+    };
+
+    var stage = $('stage');
+    stage.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      $('drop').style.borderColor = 'var(--acc)';
+    });
+    stage.addEventListener('dragleave', function (e) {
+      e.preventDefault();
+      $('drop').style.borderColor = 'var(--mute)';
+    });
+    stage.addEventListener('drop', function (e) {
+      e.preventDefault();
+      $('drop').style.borderColor = 'var(--mute)';
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        loadFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    document.addEventListener('paste', function (e) {
+      var it = (e.clipboardData || {}).items || [];
+      for (var i = 0; i < it.length; i++) {
+        if (it[i].type.indexOf('image/') === 0) {
+          loadFile(it[i].getAsFile());
+          break;
+        }
+      }
+    });
+
+    if (window.claude && claude.use) {
+      claude.use('downloads').then(function (d) { dl = d; }).catch(function () {});
+    }
+
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load('40px Anton').then(R).catch(function () {});
+    }
+
+    fillPre();
+    setTool();
+  })();
+  </script>
+</body>
+</html>
