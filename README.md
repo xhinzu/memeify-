@@ -8,6 +8,7 @@
 ![Privacy First](https://img.shields.io/badge/privacy-100%25%20Client--Side-green?style=flat-square)
 
 ---
+
 ## ⌨️ Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -16,5 +17,3 @@
 | `Ctrl + Shift + Z` / `Cmd + Shift + Z` | Redo action |
 | `Delete` / `Backspace` | Delete selected layer (text, sticker, drawing) |
 | `Ctrl + V` / `Cmd + V` | Paste image from clipboard |
-
-

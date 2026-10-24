@@ -430,7 +430,7 @@
       </details>
 
       <details>
-        <summary>Image: Crop, Rotate, Resize</summary>
+        <summary>Image: Crop, Rotate, Stretch, Resize</summary>
         <div class="row">
           <button type="button" id="rl">Rotate left</button>
           <button type="button" id="rr">Rotate right</button>
@@ -446,11 +446,30 @@
           <button type="button" id="capply">Crop</button>
         </div>
         <div class="row">
+          <select id="stretch">
+            <option value="1.5,1">Stretch Wide 1.5x (Meme)</option>
+            <option value="2,1">Ultra Wide 2x (Cat meme)</option>
+            <option value="2.5,1">Mega Wide 2.5x</option>
+            <option value="1.25,1">Slight Wide 1.25x</option>
+            <option value="0.75,1">Squish Horizontal 0.75x</option>
+            <option value="0.5,1">Squish Horizontal 0.5x</option>
+            <option value="1,1.5">Stretch Tall 1.5x</option>
+            <option value="1,2">Ultra Tall 2x</option>
+            <option value="1,0.75">Squish Vertical 0.75x</option>
+          </select>
+          <button type="button" id="stretchapply">Stretch</button>
+        </div>
+        <div class="row">
+          <button type="button" id="quickwide" title="Stretch wider horizontally by 25%">Wide ↔ (+25%)</button>
+          <button type="button" id="quicksquish" title="Squish horizontally by 20%">Squish ↔ (-20%)</button>
+          <button type="button" id="quicktall" title="Stretch taller vertically by 25%">Tall ↕ (+25%)</button>
+        </div>
+        <div class="row">
           <select id="scale">
-            <option value="0.75">75%</option>
-            <option value="0.5">50%</option>
-            <option value="0.25">25%</option>
-            <option value="2">200%</option>
+            <option value="0.75">Resize 75%</option>
+            <option value="0.5">Resize 50%</option>
+            <option value="0.25">Resize 25%</option>
+            <option value="2">Resize 200%</option>
           </select>
           <button type="button" id="sapply">Resize</button>
         </div>
@@ -1048,6 +1067,39 @@
       var c = mk(cw, ch);
       c.getContext('2d').drawImage(src, -ox, -oy);
       apply(c, function (a, b) { return [a - ox, b - oy]; });
+    };
+
+    function stretch(sx, sy) {
+      if (!src) return;
+      var newW = Math.max(10, Math.round(src.width * sx));
+      var newH = Math.max(10, Math.round(src.height * sy));
+      var c = mk(newW, newH);
+      var x = c.getContext('2d');
+      x.drawImage(src, 0, 0, newW, newH);
+      apply(c, function (a, b) {
+        return [a * sx, b * sy];
+      });
+      note('Stretched image (' + (sx !== 1 ? 'W x' + sx : '') + (sy !== 1 ? (sx !== 1 ? ', ' : '') + 'H x' + sy : '') + ')');
+    }
+
+    $('stretchapply').onclick = function () {
+      if (!src) return;
+      var parts = $('stretch').value.split(',');
+      var sx = +parts[0] || 1;
+      var sy = +parts[1] || 1;
+      stretch(sx, sy);
+    };
+
+    $('quickwide').onclick = function () {
+      stretch(1.25, 1);
+    };
+
+    $('quicksquish').onclick = function () {
+      stretch(0.8, 1);
+    };
+
+    $('quicktall').onclick = function () {
+      stretch(1, 1.25);
     };
 
     $('sapply').onclick = function () {
